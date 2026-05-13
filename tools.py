@@ -28,3 +28,19 @@ def get_context(query: str) -> str:
         assert hits.metadata is not None
         context += "\n" + str(hits.metadata.get('text', ''))
     return context
+
+@function_tool
+def search_returns_db(query: str) -> str:
+    return f"Retrieved refund docs for: {query}"
+
+@function_tool
+def calculate_refund_amount():
+    pass
+
+@function_tool
+def log_troubleshooting_step():
+    pass
+
+@function_tool
+def check_customs_status():
+    pass

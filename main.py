@@ -1,6 +1,6 @@
 from fastapi import FastAPI, responses
 import uvicorn
-from call_agent import call_agent
+from call_agent import agent_loop
 
 app = FastAPI()
 
@@ -10,7 +10,7 @@ def health():
 
 @app.get("/query/{query}")
 async def query(query: str):
-    return responses.JSONResponse(content= await call_agent(query))
+    return responses.JSONResponse(content= await agent_loop(query))
     
 
 if __name__ == '__main__':

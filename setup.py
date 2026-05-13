@@ -1,5 +1,5 @@
 from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-from agents.extensions.memory import RedisSession
+from agents.extensions.memory import MongoDBSession
 from logger import logger, logging
 from langfuse import get_client
 from dotenv import load_dotenv
@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 from pinecone import Pinecone, QueryResponse
 from constants import *
 import nest_asyncio
+import redis
 import os
 
 from utility import retry_thing
@@ -20,6 +21,8 @@ LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY") or ""
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY") or ""
 LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL") or ""
 REDIS_URL = os.getenv("REDIS_URL") or ""
+MONGO_URL = os.getenv("MONGO_URL") or ""
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME") or ""
 
 # --- Model
 
@@ -31,19 +34,32 @@ if not BASE_URL or not API_KEY or not MODEL_NAME:
     
 client = retry_thing(lambda:AsyncOpenAI(base_url=BASE_URL, api_key=API_KEY))()
 
-# --- Session / Memory
+# --- Long Term Memory ( MongoDB )
 
-logger.log(level=logging.INFO, msg="trying to connect session")
+logger.log(level=logging.INFO, msg="trying to connect Mongodb for long term memory")
 try: 
-    session = retry_thing(lambda : RedisSession.from_url(
+    session = retry_thing(lambda : MongoDBSession.from_uri(
         USER_ID,
-        url=REDIS_URL,
+        uri=MONGO_URL,
+        database=MONGO_DB_NAME,
     ))()
-    logger.log(level=logging.INFO, msg=f"session key: {session._session_key}")
+    logger.log(level=logging.INFO, msg="connected to Mongodb for long term memory")
 except Exception as e:
-    logger.log(level=logging.ERROR, msg=f"failed to connect to session, error: {e}")
+    logger.log(level=logging.ERROR, msg=f"failed to connect to Mongodb for long term memory, error: {e}")
 
-logger.log(level=logging.INFO, msg="redis connected session")
+
+# --- Short Term State ( Redis )
+logger.log(level=logging.INFO, msg="trying to connect redis for short term state")
+try:
+    redis_client = redis.Redis(
+        host=REDIS_URL.split(':')[0],
+        port=int(REDIS_URL.split(':')[1]),
+        decode_responses=True,
+        retry_on_timeout=True
+    )
+    logger.log(level=logging.INFO, msg="connected to redis for short term state")
+except Exception as e:
+    logger.log(level=logging.ERROR, msg=f"failed to connect to redis for short term state, error: {e}")
 
 # --- Pinecone setup (Vector DB)
 
@@ -62,3 +78,5 @@ if langfuse.auth_check():
     logger.log(level=logging.INFO, msg="Langfuse client is authenticated and ready!")
 else:
     logger.log(level=logging.ERROR, msg="Authentication failed. Please check your credentials and host.")
+
+
